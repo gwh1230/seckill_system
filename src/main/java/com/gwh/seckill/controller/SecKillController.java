@@ -2,6 +2,7 @@ package com.gwh.seckill.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.gwh.seckill.anno.AccessLimit;
 import com.gwh.seckill.exception.GlobalException;
 import com.gwh.seckill.pojo.Order;
 import com.gwh.seckill.pojo.SeckillMessage;
@@ -193,23 +194,26 @@ public class SecKillController implements InitializingBean {
     /**
      * 获取秒杀地址
      */
+    @AccessLimit(second = 5, maxCount = 5, needLogin = true)
     @RequestMapping(value = "/path", method = RequestMethod.GET)
     @ResponseBody
     public RespBean getPath(User user, Long goodsId, String captcha, HttpServletRequest request) {
-        if (null == user) {
-            return RespBean.error(RespBeanEnum.SESSION_ERROR);
-        }
+//        if (null == user) {
+//            return RespBean.error(RespBeanEnum.SESSION_ERROR);
+//        }
         // 使用计数器，进行接口限流，同一个用户，限制5秒内访问5次
-        ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
-        String uri = request.getRequestURI();
-        Integer count = (Integer) valueOperations.get(uri + ":" + user.getId());
-        if (null == count) {
-            valueOperations.set(uri + ":" + user.getId(), 1, 5, TimeUnit.SECONDS);
-        } else if (count < 5) {
-            valueOperations.increment(uri + ":" + user.getId());
-        } else {
-            return RespBean.error(RespBeanEnum.ACCESS_LIMIT_REAHCED);
-        }
+//        ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
+//        String uri = request.getRequestURI();
+//        Integer count = (Integer) valueOperations.get(uri + ":" + user.getId());
+//        if (null == count) {
+//            valueOperations.set(uri + ":" + user.getId(), 1, 5, TimeUnit.SECONDS);
+//        } else if (count < 5) {
+//            valueOperations.increment(uri + ":" + user.getId());
+//        } else {
+//            return RespBean.error(RespBeanEnum.ACCESS_LIMIT_REAHCED);
+//        }
+        // 使用注解拦截器方式替代接口限流
+
         Boolean check = orderService.checkCaptcha(user, goodsId, captcha);
         if (!check) {
             return RespBean.error(RespBeanEnum.ERROR_CAPTCHA);

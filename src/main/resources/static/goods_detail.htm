@@ -104,7 +104,10 @@
                 captcha: captcha
             },
             success: function (data) {
-                if (data.code === 200) {
+                if (data.code === 500215) {
+                    layer.msg(data.message);
+                    window.location.href = "/login/toLogin"
+                } else if (data.code === 200) {
                     var path = data.obj;
                     doSeckill(path);
                 } else {
@@ -135,7 +138,6 @@
                     // window.location.href = "/order_detail.htm?orderId=" + data.obj.id;
                     getResult($("#goodsId").val());
                 } else {
-                    console.log("aaaaaaaaaaaaaaaaaaaaaaa");
                     layer.msg(data.message);
                 }
             },
