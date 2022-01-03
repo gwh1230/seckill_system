@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
@@ -129,8 +131,8 @@ public class SecKillController implements InitializingBean {
             return RespBean.error(RespBeanEnum.EMPTY_STOCK);
         }
         // 判断重复抢购
-        Order order = (Order) redisTemplate.opsForValue().get("order:" + goodsId + ":" + user.getId());
-        if (null != order) {
+        SeckillOrder seckillOrder = (SeckillOrder) redisTemplate.opsForValue().get("order:" + user.getId() + ":" + goodsId);
+        if (null != seckillOrder) {
             return RespBean.error(RespBeanEnum.REPEATE_ERROR);
         }
         // 预减库存，decrement()是原子性的
@@ -193,12 +195,23 @@ public class SecKillController implements InitializingBean {
      */
     @RequestMapping(value = "/path", method = RequestMethod.GET)
     @ResponseBody
-    public RespBean getPath(User user, Long goodsId,String captcha) {
+    public RespBean getPath(User user, Long goodsId, String captcha, HttpServletRequest request) {
         if (null == user) {
             return RespBean.error(RespBeanEnum.SESSION_ERROR);
         }
+        // 使用计数器，进行接口限流，同一个用户，限制5秒内访问5次
+        ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
+        String uri = request.getRequestURI();
+        Integer count = (Integer) valueOperations.get(uri + ":" + user.getId());
+        if (null == count) {
+            valueOperations.set(uri + ":" + user.getId(), 1, 5, TimeUnit.SECONDS);
+        } else if (count < 5) {
+            valueOperations.increment(uri + ":" + user.getId());
+        } else {
+            return RespBean.error(RespBeanEnum.ACCESS_LIMIT_REAHCED);
+        }
         Boolean check = orderService.checkCaptcha(user, goodsId, captcha);
-        if (!check){
+        if (!check) {
             return RespBean.error(RespBeanEnum.ERROR_CAPTCHA);
         }
         String path = orderService.createPath(user, goodsId);
