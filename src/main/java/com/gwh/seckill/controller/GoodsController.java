@@ -2,7 +2,6 @@ package com.gwh.seckill.controller;
 
 import com.gwh.seckill.pojo.User;
 import com.gwh.seckill.service.IGoodsService;
-import com.gwh.seckill.service.IUserService;
 import com.gwh.seckill.vo.DetailVo;
 import com.gwh.seckill.vo.GoodsVo;
 import com.gwh.seckill.vo.RespBean;
@@ -27,9 +26,6 @@ import java.util.concurrent.TimeUnit;
 @Controller
 @RequestMapping("/goods")
 public class GoodsController {
-
-    @Autowired
-    private IUserService userService;
 
     @Autowired
     private IGoodsService goodsService;
@@ -72,59 +68,11 @@ public class GoodsController {
 
     /**
      * 详情页面
-     * 前后端分离前，将整个页面传到前端
-     * <p>
-     * url缓存，将每个商品的详情页面进行缓存
-     * key: "goodsDetails:" + goodsId, value: html
-     */
-    @RequestMapping(value = "/toDetail/{goodsId}", produces = "text/html;charset=utf-8")
-    @ResponseBody
-    public String toDetail(@PathVariable Long goodsId, Model model, User user,
-                           HttpServletRequest request, HttpServletResponse response) {
-//        if (null == user) {
-//            return "login";
-//        }
-        ValueOperations<String, String> valueOperations = redisTemplate.opsForValue();
-        String html = valueOperations.get("goodsDetail:" + goodsId);
-        if (!StringUtils.isEmpty(html)) {
-            return html;
-        }
-        model.addAttribute("user", user);
-        GoodsVo goodsVo = goodsService.findGoodsVoByGoodsId(goodsId);
-        Date startDate = goodsVo.getStartDate();
-        Date endDate = goodsVo.getEndDate();
-        Date nowDate = new Date();
-        int seckillStatus = 0;
-        int remainSeconds = 0;
-        if (nowDate.before(startDate)) {
-            remainSeconds = (int) ((startDate.getTime() - nowDate.getTime()) / 1000);
-        } else if (nowDate.after(endDate)) {
-            seckillStatus = 2;
-            remainSeconds = -1;
-        } else {
-            seckillStatus = 1;
-        }
-        model.addAttribute("seckillStatus", seckillStatus);
-        model.addAttribute("remainSeconds", remainSeconds);
-        model.addAttribute("goods", goodsVo);
-
-        WebContext context = new WebContext(request, response,
-                request.getServletContext(), request.getLocale(), model.asMap());
-        html = thymeleafViewResolver.getTemplateEngine().process("goods_detail", context);
-        if (!StringUtils.isEmpty(html)) {
-            valueOperations.set("goodsDetail:" + goodsId, html, 60, TimeUnit.SECONDS);
-        }
-        return html;
-    }
-
-
-    /**
-     * 详情页面
      * 前后端分离后，将前端页面静态化
      */
     @RequestMapping("/detail/{goodsId}")
     @ResponseBody
-    public RespBean toDetail2(@PathVariable Long goodsId, User user) {
+    public RespBean toDetail(@PathVariable Long goodsId, User user) {
         if (user == null) {
             return RespBean.error(RespBeanEnum.SESSION_ERROR);
         }

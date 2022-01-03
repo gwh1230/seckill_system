@@ -68,57 +68,15 @@ public class SecKillController implements InitializingBean {
     private Map<Long, Boolean> emptyStockMap = new HashMap<>();
 
     /**
-     * 秒杀页面静态化之前的实现方式
-     *
-     * @param model
-     * @param user
-     * @param goodsId
-     * @return
-     */
-    @RequestMapping("/doSeckill")
-    public String doSeckill(Model model, User user, Long goodsId) {
-        System.out.println("seckill2-" + goodsId + "-" + user.toString());
-        if (user == null) {
-            return "login";
-        }
-        model.addAttribute("user", user);
-        GoodsVo goods = goodsService.findGoodsVoByGoodsId(goodsId);
-        // 判断库存
-        if (goods.getStockCount() < 1) {
-            model.addAttribute("errmsg", RespBeanEnum.EMPTY_STOCK.getMessage());
-            return "seckill_fail";
-        }
-        // 判断是否重复抢购
-        SeckillOrder seckillOrder = seckillOrderService.getOne(
-                new QueryWrapper<SeckillOrder>()
-                        .eq("user_id", user.getId())
-                        .eq("goods_id", goodsId));
-        if (null != seckillOrder) {
-            model.addAttribute("errmsg", RespBeanEnum.REPEATE_ERROR.getMessage());
-            return "seckill_fail";
-        }
-        Order order = orderService.secKill(user, goods);
-        model.addAttribute("order", order);
-        model.addAttribute("goods", goods);
-        return "order_detail";
-
-    }
-
-
-    /**
      * 秒杀
      * windows优化前QPS: 785
      * 使用缓存优化后QPS: 1356
      * 使用Redis预减库存、RabbitMQ后QPS: 2454
      * 秒杀页面静态化
-     *
-     * @param user
-     * @param goodsId
-     * @return
      */
-    @RequestMapping(value = "/{path}/doSeckill2", method = RequestMethod.POST)
+    @RequestMapping(value = "/{path}/doSeckill", method = RequestMethod.POST)
     @ResponseBody
-    public RespBean doSeckill2(@PathVariable String path, User user, Long goodsId) {
+    public RespBean doSeckill(@PathVariable String path, User user, Long goodsId) {
         if (user == null) {
             return RespBean.error(RespBeanEnum.SESSION_ERROR);
         }
@@ -134,7 +92,7 @@ public class SecKillController implements InitializingBean {
         // 判断重复抢购
         SeckillOrder seckillOrder = (SeckillOrder) redisTemplate.opsForValue().get("order:" + user.getId() + ":" + goodsId);
         if (null != seckillOrder) {
-            return RespBean.error(RespBeanEnum.REPEATE_ERROR);
+            return RespBean.error(RespBeanEnum.REPEATE_ERROR,seckillOrder.getOrderId());
         }
         // 预减库存，decrement()是原子性的
 //        Long stock = redisTemplate.opsForValue().decrement("seckillGoods:" + goodsId);
@@ -149,29 +107,6 @@ public class SecKillController implements InitializingBean {
         SeckillMessage seckillMessage = new SeckillMessage(user, goodsId);
         mqSender.sendSeckillMessage(JSON.toJSONString(seckillMessage));
         return RespBean.success(0);
-
-        /*
-        GoodsVo goods = goodsService.findGoodsVoByGoodsId(goodsId);
-        // 判断库存
-        if (goods.getStockCount() < 1) {
-            return RespBean.error(RespBeanEnum.EMPTY_STOCK);
-        }
-        // 判断是否重复抢购
-//        SeckillOrder seckillOrder = seckillOrderService.getOne(
-//                new QueryWrapper<SeckillOrder>()
-//                        .eq("user_id", user.getId())
-//                        .eq("goods_id", goodsId));
-        // 通过redis来获取
-        SeckillOrder seckillOrder = (SeckillOrder) redisTemplate.opsForValue().get("order:" + user.getId() + ":" + goods.getId());
-        if (null != seckillOrder) {
-            return RespBean.error(RespBeanEnum.REPEATE_ERROR);
-        }
-        Order order = orderService.secKill(user, goods);
-        if (null == order) {
-            return RespBean.error(RespBeanEnum.EMPTY_STOCK);
-        }
-        return RespBean.success(order);
-         */
     }
 
     /**
@@ -193,27 +128,12 @@ public class SecKillController implements InitializingBean {
 
     /**
      * 获取秒杀地址
+     * 使用注解AccessLimit拦截器方式替代接口限流
      */
     @AccessLimit(second = 5, maxCount = 5, needLogin = true)
     @RequestMapping(value = "/path", method = RequestMethod.GET)
     @ResponseBody
-    public RespBean getPath(User user, Long goodsId, String captcha, HttpServletRequest request) {
-//        if (null == user) {
-//            return RespBean.error(RespBeanEnum.SESSION_ERROR);
-//        }
-        // 使用计数器，进行接口限流，同一个用户，限制5秒内访问5次
-//        ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
-//        String uri = request.getRequestURI();
-//        Integer count = (Integer) valueOperations.get(uri + ":" + user.getId());
-//        if (null == count) {
-//            valueOperations.set(uri + ":" + user.getId(), 1, 5, TimeUnit.SECONDS);
-//        } else if (count < 5) {
-//            valueOperations.increment(uri + ":" + user.getId());
-//        } else {
-//            return RespBean.error(RespBeanEnum.ACCESS_LIMIT_REAHCED);
-//        }
-        // 使用注解拦截器方式替代接口限流
-
+    public RespBean getPath(User user, Long goodsId, String captcha) {
         Boolean check = orderService.checkCaptcha(user, goodsId, captcha);
         if (!check) {
             return RespBean.error(RespBeanEnum.ERROR_CAPTCHA);
@@ -245,8 +165,6 @@ public class SecKillController implements InitializingBean {
 
     /**
      * 初始化，把商品库存数量加载到Redis
-     *
-     * @throws Exception
      */
     @Override
     public void afterPropertiesSet() throws Exception {

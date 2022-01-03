@@ -26,18 +26,6 @@ public class RedisConfig {
     }
 
     /**
-     * redis lua测试脚本配置
-     */
-    @Bean
-    public DefaultRedisScript<Boolean> testScript() {
-        DefaultRedisScript<Boolean> redisScript = new DefaultRedisScript<>();
-        // lock.lua脚本位置和application.yml同级目录
-        redisScript.setLocation(new ClassPathResource("lock.lua"));
-        redisScript.setResultType(Boolean.class);
-        return redisScript;
-    }
-
-    /**
      * redis lua 预减库存脚本
      */
     @Bean

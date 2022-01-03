@@ -29,10 +29,6 @@ public class OrderController {
 
     /**
      * 订单详情
-     *
-     * @param user
-     * @param orderId
-     * @return
      */
     @RequestMapping("/detail")
     @ResponseBody
