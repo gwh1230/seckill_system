@@ -134,4 +134,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return path.equals(redisPath);
 
     }
+
+    @Override
+    public Boolean checkCaptcha(User user, Long goodsId, String captcha) {
+        if (StringUtils.isEmpty(captcha) || null == user || goodsId < 0) {
+            return false;
+        }
+        String redisCaptcha = (String) redisTemplate.opsForValue().get("captcha:" + user.getId() + ":" + goodsId);
+        return captcha.equals(redisCaptcha);
+    }
 }
